@@ -1,0 +1,5 @@
+{
+  "name": "MessengerPulse",
+  "description": "O aplicație de gestionare a mesajelor care identifică conversațiile inactive de peste 24 de ore și sugerează răspunsuri automate sau generate de AI.",
+  "requestFramePermissions": []
+}
