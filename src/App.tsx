@@ -21,7 +21,7 @@ const App: React.FC = () => {
 
   // Load auth data from localStorage on initial render
   useEffect(() => {
-    const storedAuthData = localStorage.getItem('authData');
+    const storedAuthData = localStorage.getItem('auth_data');
     if (storedAuthData) {
       const parsedAuthData = JSON.parse(storedAuthData);
       setAuthData(parsedAuthData);
