@@ -66,7 +66,8 @@ export const loginToFacebook = async (): Promise<FacebookAuthResponse> => {
 
 /**
  * Preia conversațiile paginii.
- * IMPLEMENTARE PAGINARE: Preia datele în loturi mici pentru a evita eroarea "Please reduce amount of data".
+ * IMPLEMENTARE PAGINARE: Preia datele în loturi mici (25) dar face mai multe cereri (max 8) 
+ * pentru a ajunge la totalul de 200 conversații fără a bloca API-ul.
  */
 export const getPageConversations = async (pageId: string, accessToken: string): Promise<Conversation[]> => {
   // 1. Dacă folosim token simulat, returnăm date mock
@@ -82,8 +83,8 @@ export const getPageConversations = async (pageId: string, accessToken: string):
   // 2. Dacă avem un token real, apelăm Facebook API cu paginare
   console.log(`Se conectează la Graph API Real pentru pagina ${pageId}...`);
   try {
-    const BATCH_SIZE = 20; // Păstrăm un batch mic pentru stabilitate
-    const MAX_PAGES = 3;   // Încercăm să luăm 3 pagini (aprox 60 conversații)
+    const BATCH_SIZE = 25; // Sigur pentru Facebook API
+    const MAX_PAGES = 8;   // 8 * 25 = 200 conversații total
     
     // Solicităm până la 30 de mesaje per conversație
     const fields = 'participants,updated_time,messages.limit(30){message,created_time,from,to}';
@@ -104,8 +105,8 @@ export const getPageConversations = async (pageId: string, accessToken: string):
                  (errorObj as any).code = data.error.code;
                  throw errorObj;
             } else {
-                // Dacă eșuează la pagina 2 sau 3, ne oprim și returnăm ce avem până acum
-                console.warn("Eroare la preluarea paginii următoare, ne oprim aici.", data.error);
+                // Dacă eșuează la pagina ulterioară, ne oprim și returnăm ce avem
+                console.warn("Oprire forțată paginare (limită API sau eroare).", data.error);
                 break;
             }
         }

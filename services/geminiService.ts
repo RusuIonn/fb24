@@ -11,8 +11,16 @@ export const generateFollowUpMessage = async (
     let apiKey = manualApiKey;
 
     // Safe check for process.env (prevents crash on Vercel/Browsers)
-    if (!apiKey && typeof process !== 'undefined' && process.env && process.env.API_KEY) {
-      apiKey = process.env.API_KEY;
+    if (!apiKey) {
+        try {
+            // @ts-ignore
+            if (typeof process !== 'undefined' && process.env && process.env.API_KEY) {
+                // @ts-ignore
+                apiKey = process.env.API_KEY;
+            }
+        } catch (e) {
+            // ignore
+        }
     }
 
     if (!apiKey) {
