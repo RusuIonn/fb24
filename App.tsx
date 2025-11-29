@@ -7,6 +7,7 @@ import { DEFAULT_PRESET_MESSAGE } from './constants';
 import { loginToFacebook, getPageConversations, sendFacebookMessage, getFacebookPageDetails } from './services/facebookService';
 
 const STORAGE_KEY = 'messenger_pulse_auth';
+const GEMINI_KEY_STORAGE = 'messenger_pulse_gemini_key';
 
 const App: React.FC = () => {
   // Auth State
@@ -21,10 +22,15 @@ const App: React.FC = () => {
   const [showSettings, setShowSettings] = useState(false);
   const [isLoadingData, setIsLoadingData] = useState(false);
   const [fetchError, setFetchError] = useState<string | null>(null);
-  const [hasApiKey, setHasApiKey] = useState(false);
+  
+  // Gemini API Key State
+  const [hasEnvApiKey, setHasEnvApiKey] = useState(false);
+  const [customApiKey, setCustomApiKey] = useState('');
+  const [isAiStudioEnvironment, setIsAiStudioEnvironment] = useState(false);
 
-  // 1. Load Auth from LocalStorage on Mount
+  // 1. Load Auth & Settings from LocalStorage on Mount
   useEffect(() => {
+    // Auth
     const storedAuth = localStorage.getItem(STORAGE_KEY);
     if (storedAuth) {
       try {
@@ -40,7 +46,14 @@ const App: React.FC = () => {
         localStorage.removeItem(STORAGE_KEY);
       }
     }
-    checkApiKey();
+
+    // Gemini Key
+    const storedGeminiKey = localStorage.getItem(GEMINI_KEY_STORAGE);
+    if (storedGeminiKey) {
+        setCustomApiKey(storedGeminiKey);
+    }
+
+    checkEnvironment();
   }, []);
 
   // 2. Save Auth to LocalStorage on Change
@@ -52,29 +65,37 @@ const App: React.FC = () => {
     }
   }, [authData]);
 
-  // Check for API Key presence
+  // 3. Save Gemini Key to LocalStorage
   useEffect(() => {
-    checkApiKey();
-  }, [showSettings]);
-
-  const checkApiKey = async () => {
-    try {
-      if ((window as any).aistudio?.hasSelectedApiKey) {
-        const has = await (window as any).aistudio.hasSelectedApiKey();
-        setHasApiKey(has);
+      if (customApiKey) {
+          localStorage.setItem(GEMINI_KEY_STORAGE, customApiKey);
+      } else {
+          localStorage.removeItem(GEMINI_KEY_STORAGE);
       }
-    } catch (e) {
-      console.error("Error checking API key status", e);
+  }, [customApiKey]);
+
+  // Check environment capabilities
+  const checkEnvironment = async () => {
+    const isAiStudio = !!(window as any).aistudio;
+    setIsAiStudioEnvironment(isAiStudio);
+    
+    if (isAiStudio) {
+         try {
+            if ((window as any).aistudio?.hasSelectedApiKey) {
+                const has = await (window as any).aistudio.hasSelectedApiKey();
+                setHasEnvApiKey(has);
+            }
+        } catch (e) {
+            console.error("Error checking API key status", e);
+        }
     }
   };
 
-  const handleSetApiKey = async () => {
+  const handleSetAiStudioKey = async () => {
     try {
       if ((window as any).aistudio?.openSelectKey) {
         await (window as any).aistudio.openSelectKey();
-        await checkApiKey(); // Re-check status after selection
-      } else {
-        alert("Selectorul de chei API nu este disponibil în acest mediu.");
+        await checkEnvironment(); // Re-check status after selection
       }
     } catch (e) {
       console.error("Error opening key selector", e);
@@ -371,6 +392,7 @@ const App: React.FC = () => {
             conversation={activeConversation} 
             onSendMessage={handleSendMessage}
             presetMessage={presetMessage}
+            apiKey={customApiKey || (typeof process !== 'undefined' ? process.env?.API_KEY : '') || ''}
         />
       </div>
 
@@ -445,31 +467,51 @@ const App: React.FC = () => {
                         <label className="block text-sm font-medium text-gray-700">
                             Gemini API Key
                         </label>
-                        <span className={`text-[10px] px-2 py-0.5 rounded-full border ${hasApiKey ? 'bg-green-50 text-green-700 border-green-200' : 'bg-yellow-50 text-yellow-700 border-yellow-200'}`}>
-                            {hasApiKey ? 'Conectat' : 'Nu este setat'}
+                        <span className={`text-[10px] px-2 py-0.5 rounded-full border ${hasEnvApiKey || customApiKey ? 'bg-green-50 text-green-700 border-green-200' : 'bg-yellow-50 text-yellow-700 border-yellow-200'}`}>
+                            {hasEnvApiKey || customApiKey ? 'Conectat' : 'Nu este setat'}
                         </span>
                     </div>
                     
                     <div className="flex flex-col gap-2">
-                         <div className="relative">
-                            <input 
-                                type="password" 
-                                value={hasApiKey ? "********************************" : ""} 
-                                disabled
-                                placeholder="Niciun API Key setat"
-                                className="w-full p-2.5 border border-gray-200 bg-gray-50 rounded-lg text-sm text-gray-500 mb-2 cursor-not-allowed"
-                            />
-                        </div>
-                        <button
-                            onClick={handleSetApiKey}
-                            className="flex items-center justify-center gap-2 w-full p-2.5 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-700 hover:bg-blue-100 transition-colors font-medium"
-                        >
-                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"></path></svg>
-                            {hasApiKey ? 'Schimbă API Key' : 'Configurează API Key'}
-                        </button>
-                        <p className="text-[10px] text-gray-400 text-center">
-                            Deschide fereastra securizată Google AI Studio pentru a selecta cheia.
-                        </p>
+                         {isAiStudioEnvironment ? (
+                             <>
+                                <div className="relative">
+                                    <input 
+                                        type="password" 
+                                        value={hasEnvApiKey ? "********************************" : ""} 
+                                        disabled
+                                        placeholder="Niciun API Key setat"
+                                        className="w-full p-2.5 border border-gray-200 bg-gray-50 rounded-lg text-sm text-gray-500 mb-2 cursor-not-allowed"
+                                    />
+                                </div>
+                                <button
+                                    onClick={handleSetAiStudioKey}
+                                    className="flex items-center justify-center gap-2 w-full p-2.5 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-700 hover:bg-blue-100 transition-colors font-medium"
+                                >
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"></path></svg>
+                                    {hasEnvApiKey ? 'Schimbă API Key (AI Studio)' : 'Configurează API Key'}
+                                </button>
+                                <p className="text-[10px] text-gray-400 text-center">
+                                    Deschide selectorul securizat Google AI Studio.
+                                </p>
+                             </>
+                         ) : (
+                             <>
+                                <input 
+                                    type="password" 
+                                    value={customApiKey}
+                                    onChange={(e) => setCustomApiKey(e.target.value)}
+                                    placeholder="Lipește cheia Gemini API (AI Studio)"
+                                    className="w-full p-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                />
+                                <p className="text-[10px] text-gray-400">
+                                    Deoarece nu ești în mediul AI Studio, trebuie să introduci manual cheia API.
+                                    <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noreferrer" className="text-blue-500 hover:underline ml-1">
+                                        Obține cheia aici.
+                                    </a>
+                                </p>
+                             </>
+                         )}
                     </div>
                 </div>
 
