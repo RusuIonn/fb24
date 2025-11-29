@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
-import ConversationList from './components/ConversationList';
-import ChatWindow from './components/ChatWindow';
-import LoginScreen from './components/LoginScreen';
-import { Conversation, Message, PresetMessage } from './types';
-import { DEFAULT_PRESET_MESSAGE } from './constants';
-import { loginToFacebook, getPageConversations, sendFacebookMessage, getFacebookPageDetails } from './services/facebookService';
+import ConversationList from '@/components/ConversationList';
+import ChatWindow from '@/components/ChatWindow';
+import LoginScreen from '@/components/LoginScreen';
+import { Conversation, Message, PresetMessage } from '@/types';
+import { DEFAULT_PRESET_MESSAGE } from '@/constants';
+import { loginToFacebook, getPageConversations, sendFacebookMessage, getFacebookPageDetails } from '@/services/facebookService';
 
 const App: React.FC = () => {
   // Auth State
@@ -247,7 +247,7 @@ const App: React.FC = () => {
       </div>
 
       {/* Main Chat Area */}
-      <div className={`flex-1 flex flex-col h-full w-full relative z-10 bg-white md:block ${!selectedId ? 'hidden' : 'block'}`}>
+      <main className="flex-1 flex flex-col h-full w-full relative z-10 bg-white">
         {selectedId && (
             <button 
                 onClick={() => setSelectedId(null)}
@@ -261,7 +261,7 @@ const App: React.FC = () => {
             onSendMessage={handleSendMessage}
             presetMessage={presetMessage}
         />
-      </div>
+      </main>
 
       {/* Settings Modal */}
       {showSettings && (

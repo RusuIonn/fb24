@@ -1,5 +1,5 @@
-import { Conversation, Message } from '../types';
-import { MOCK_CONVERSATIONS } from '../constants';
+import { Conversation, Message } from '@/types';
+import { MOCK_CONVERSATIONS } from '@/constants';
 
 const GRAPH_API_VERSION = 'v19.0';
 
@@ -9,16 +9,36 @@ interface FacebookAuthResponse {
   pageName: string;
 }
 
+interface FacebookError {
+  error: {
+    message: string;
+    type: string;
+    code: number;
+    fbtrace_id: string;
+  };
+}
+
+interface FacebookConversationsResponse {
+  data: any[];
+  paging?: {
+    cursors: {
+      before: string;
+      after: string;
+    };
+    next?: string;
+  };
+}
+
 /**
- * Verifică token-ul și preia detaliile reale ale paginii (ID, Nume).
+ * Verifies the token and retrieves the actual page details (ID, Name).
  */
 export const getFacebookPageDetails = async (accessToken: string): Promise<{id: string, name: string}> => {
   if (accessToken.startsWith('mock_')) {
      return { id: '1000123456789', name: 'Magazin Demo (Mock)' };
   }
 
-  const response = await fetch(`https://graph.facebook.com/${GRAPH_API_VERSION}/me?fields=id,name&access_token=${accessToken}`);
-  const data = await response.json();
+  const response: Response = await fetch(`https://graph.facebook.com/${GRAPH_API_VERSION}/me?fields=id,name&access_token=${accessToken}`);
+  const data: { id: string, name: string } & FacebookError = await response.json();
   
   if (data.error) {
     throw new Error(data.error.message);
@@ -27,10 +47,10 @@ export const getFacebookPageDetails = async (accessToken: string): Promise<{id: 
 };
 
 /**
- * Simulează procesul de Login cu Facebook.
+ * Simulates the Facebook Login process.
  */
 export const loginToFacebook = async (): Promise<FacebookAuthResponse> => {
-  console.log("Se inițiază SDK-ul Facebook (Mock)...");
+  console.log("Initiating Facebook SDK (Mock)...");
   
   return new Promise((resolve) => {
     setTimeout(() => {
@@ -44,13 +64,12 @@ export const loginToFacebook = async (): Promise<FacebookAuthResponse> => {
 };
 
 /**
- * Preia conversațiile paginii.
- * Dacă token-ul este real, face request către Graph API.
+ * Retrieves the page's conversations.
+ * If the token is real, it makes a request to the Graph API.
  */
 export const getPageConversations = async (pageId: string, accessToken: string): Promise<Conversation[]> => {
-  // 1. Dacă folosim token simulat, returnăm date mock
   if (accessToken.startsWith('mock_')) {
-    console.log("Folosind date simulate (Mock Token detectat)");
+    console.log("Using simulated data (Mock Token detected)");
     return new Promise((resolve) => {
       setTimeout(() => {
         resolve(MOCK_CONVERSATIONS);
@@ -58,47 +77,53 @@ export const getPageConversations = async (pageId: string, accessToken: string):
     });
   }
 
-  // 2. Dacă avem un token real, apelăm Facebook API
-  console.log(`Se conectează la Graph API Real pentru pagina ${pageId}...`);
+  console.log(`Connecting to the real Graph API for page ${pageId}...`);
   try {
-    // Cerem conversațiile împreună cu mesajele (limitat la 50 pentru a evita erorile de volum) și participanții
-    // Optimizare: limit=200 conversații și limit=50 mesaje per conversație
+    let allConversations: any[] = [];
     const fields = 'participants,updated_time,messages.limit(50){message,created_time,from,to}';
-    const url = `https://graph.facebook.com/${GRAPH_API_VERSION}/${pageId}/conversations?limit=200&fields=${fields}&access_token=${accessToken}`;
-    
-    const response = await fetch(url);
-    const data = await response.json();
+    let url: string | undefined = `https://graph.facebook.com/${GRAPH_API_VERSION}/${pageId}/conversations?limit=50&fields=${fields}&access_token=${accessToken}`;
+    let pagesFetched = 0;
 
-    if (data.error) {
-      throw new Error(`Facebook API Error: ${data.error.message}`);
+    while (url && pagesFetched < 6) {
+      const response: Response = await fetch(url);
+      const data: FacebookConversationsResponse & FacebookError = await response.json();
+
+      if (data.error) {
+        throw new Error(`Facebook API Error: ${data.error.message}`);
+      }
+
+      if (data.data) {
+        allConversations = allConversations.concat(data.data);
+      }
+
+      url = data.paging?.next;
+      pagesFetched++;
     }
 
-    return transformFacebookData(data, pageId);
+    return transformFacebookData({ data: allConversations }, pageId);
   } catch (error) {
-    console.error("Eroare la preluarea conversațiilor:", error);
+    console.error("Error fetching conversations:", error);
     throw error;
   }
 };
 
 /**
- * Trimite un mesaj într-o conversație reală.
+ * Sends a message in a real conversation.
  */
 export const sendFacebookMessage = async (
   recipientId: string, 
   text: string, 
   accessToken: string
 ): Promise<boolean> => {
-  // 1. Simulare
   if (accessToken.startsWith('mock_')) {
-    console.log(`[SIMULARE] Mesaj trimis către ${recipientId}: ${text}`);
+    console.log(`[SIMULATION] Message sent to ${recipientId}: ${text}`);
     return new Promise((resolve) => setTimeout(() => resolve(true), 800));
   }
 
-  // 2. API Real
-  console.log(`Se trimite mesaj real către ${recipientId}`);
+  console.log(`Sending a real message to ${recipientId}`);
   try {
     const url = `https://graph.facebook.com/${GRAPH_API_VERSION}/me/messages?access_token=${accessToken}`;
-    const response = await fetch(url, {
+    const response: Response = await fetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -110,35 +135,31 @@ export const sendFacebookMessage = async (
       })
     });
 
-    const data = await response.json();
+    const data: FacebookError = await response.json();
     if (data.error) {
-       // Tratăm eroarea specifică #551 (Persoana indisponibilă)
        if (data.error.code === 551) {
-           throw new Error("Această persoană nu este disponibilă momentan (Error #551). Verificați permisiunile sau dacă utilizatorul v-a contactat recent.");
+           throw new Error("This person is not available right now (Error #551). Check permissions or if the user has contacted you recently.");
        }
       throw new Error(`Facebook Send API Error: (#${data.error.code}) ${data.error.message}`);
     }
     
     return true;
   } catch (error) {
-    console.error("Eroare la trimiterea mesajului:", error);
+    console.error("Error sending message:", error);
     throw error;
   }
 };
 
 /**
- * Transformă datele brute de la Facebook în formatul intern al aplicației.
+ * Transforms the raw data from Facebook into the application's internal format.
  */
-export const transformFacebookData = (fbData: any, pageId: string): Conversation[] => {
+export const transformFacebookData = (fbData: { data: any[] }, pageId: string): Conversation[] => {
   if (!fbData || !fbData.data) return [];
 
   return fbData.data.map((thread: any) => {
-    // Identificăm partenerul (cel care NU este pagina curentă)
     const participants = thread.participants?.data || [];
     let partner = participants.find((p: any) => p.id !== pageId);
     
-    // Fallback: Dacă nu putem identifica partenerul din lista de participanți, 
-    // încercăm să îl găsim în mesaje (sender care nu este pagina)
     if (!partner && thread.messages?.data) {
         const incomingMsg = thread.messages.data.find((m: any) => m.from && m.from.id !== pageId);
         if (incomingMsg) {
@@ -146,22 +167,17 @@ export const transformFacebookData = (fbData: any, pageId: string): Conversation
         }
     }
 
-    // Fallback names
-    const partnerName = partner?.name || 'Utilizator Facebook';
-    const partnerId = partner?.id; // Important: ID-ul utilizatorului (PSID) pentru trimiterea răspunsului
+    const partnerName = partner?.name || 'Facebook User';
+    const partnerId = partner?.id;
 
-    // Mapăm mesajele
     const rawMessages = thread.messages?.data || [];
-    // Facebook returnează mesajele în ordine inversă (cel mai recent primul), le inversăm pentru afișare
     const messages: Message[] = rawMessages.map((m: any) => ({
       id: m.id,
       text: m.message || '[Media/Attachment]',
-      // CRITICAL: Ensure robust sender check even if pageId format varies slightly
       sender: (m.from?.id === pageId) ? 'me' : 'partner',
       timestamp: new Date(m.created_time).getTime()
     })).reverse();
 
-    // Determinăm statusul (simplificat)
     const lastMsg = messages[messages.length - 1];
     let status: 'active' | 'waiting_for_partner' | 'waiting_for_me' = 'active';
     if (lastMsg) {
@@ -169,10 +185,9 @@ export const transformFacebookData = (fbData: any, pageId: string): Conversation
     }
 
     return {
-      id: thread.id, // Conversation ID
+      id: thread.id,
       partnerId: partnerId,
       partnerName,
-      // Folosim un avatar generat deoarece FB nu oferă imaginea publică direct prin API standard fără permisiuni avansate
       avatarUrl: `https://ui-avatars.com/api/?name=${encodeURIComponent(partnerName)}&background=random&color=fff`, 
       messages,
       status
