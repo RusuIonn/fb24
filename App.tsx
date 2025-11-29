@@ -101,7 +101,7 @@ const App: React.FC = () => {
           handleLogout();
           alert("Sesiunea de Facebook a expirat sau token-ul este invalid. Te rugăm să te conectezi din nou.");
       } else {
-          setFetchError(`Eroare conexiune: ${error.message || 'Verifică internetul'}`);
+          setFetchError(`Eroare conexiune: ${error.message || 'Verifică conexiunea la internet sau antivirusul.'}`);
       }
     } finally {
       setIsLoadingData(false);
@@ -265,6 +265,7 @@ const App: React.FC = () => {
       <div className="h-screen flex items-center justify-center bg-gray-100 flex-col gap-4">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
         <p className="text-gray-500 font-medium">Se sincronizează datele cu Facebook...</p>
+        <p className="text-xs text-gray-400">Preluăm loturi de conversații...</p>
         <button onClick={handleLogout} className="text-xs text-blue-500 hover:underline mt-4">
             Anulează și Deconectează
         </button>
@@ -280,7 +281,7 @@ const App: React.FC = () => {
             <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
         </div>
         <h2 className="text-xl font-bold text-gray-800">Eroare la încărcare</h2>
-        <p className="text-gray-500 max-w-sm">{fetchError}</p>
+        <p className="text-gray-500 max-w-sm text-sm">{fetchError}</p>
         <div className="flex gap-3 mt-4">
             <button 
                 onClick={() => authData && loadConversations(authData.pageId, authData.accessToken)} 
