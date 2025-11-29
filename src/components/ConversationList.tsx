@@ -9,6 +9,7 @@ interface ConversationListProps {
 
 const ConversationList: React.FC<ConversationListProps> = ({ conversations, selectedId, onSelect }) => {
   const [filterOverdue, setFilterOverdue] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
 
   // Helper to check if conversation is overdue (last msg from me > 24h)
   const isOverdue = (conv: Conversation) => {
@@ -30,41 +31,76 @@ const ConversationList: React.FC<ConversationListProps> = ({ conversations, sele
     return date.toLocaleDateString('ro-RO', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
   };
 
-  const filteredConversations = filterOverdue 
+  const baseConversations = filterOverdue
     ? conversations.filter(isOverdue)
     : conversations;
 
+  const searchResults = baseConversations.reduce<{
+    nameMatch: Conversation[],
+    contentMatch: Conversation[]
+  }>((acc, conv) => {
+    const term = searchTerm.toLowerCase();
+    const nameMatch = conv.partnerName.toLowerCase().includes(term);
+
+    if (nameMatch) {
+      acc.nameMatch.push(conv);
+    } else {
+      const contentMatch = conv.messages.some(msg => msg.text.toLowerCase().includes(term));
+      if (contentMatch) {
+        acc.contentMatch.push(conv);
+      }
+    }
+    return acc;
+  }, { nameMatch: [], contentMatch: [] });
+
+  const finalConversationList = searchTerm
+    ? [...searchResults.nameMatch, ...searchResults.contentMatch]
+    : baseConversations;
+
   return (
     <div className="flex flex-col h-full bg-white border-r border-gray-200 w-full md:w-80">
-      <div className="p-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
-        <div>
-           <h2 className="text-xl font-bold text-gray-800">Mesaje</h2>
-           <p className="text-xs text-gray-500 mt-1">Inbox Pagina</p>
+      <div className="p-4 border-b border-gray-200 bg-gray-50">
+        <div className="flex justify-between items-center mb-4">
+            <div>
+               <h2 className="text-xl font-bold text-gray-800">Mesaje</h2>
+               <p className="text-xs text-gray-500 mt-1">Inbox Pagina</p>
+            </div>
+
+            <button
+                onClick={() => setFilterOverdue(!filterOverdue)}
+                className={`p-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1 ${
+                    filterOverdue
+                    ? 'bg-red-100 text-red-700 border border-red-200'
+                    : 'bg-white text-gray-600 border border-gray-300 hover:bg-gray-100'
+                }`}
+                title="Arată doar mesajele fără răspuns de 24h"
+            >
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon></svg>
+                {filterOverdue ? 'Doar expirate' : 'Toate'}
+            </button>
         </div>
-        
-        {/* Filter Toggle */}
-        <button 
-            onClick={() => setFilterOverdue(!filterOverdue)}
-            className={`p-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1 ${
-                filterOverdue 
-                ? 'bg-red-100 text-red-700 border border-red-200' 
-                : 'bg-white text-gray-600 border border-gray-300 hover:bg-gray-100'
-            }`}
-            title="Arată doar mesajele fără răspuns de 24h"
-        >
-            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon></svg>
-            {filterOverdue ? 'Doar expirate' : 'Toate'}
-        </button>
+
+        {/* Search Input */}
+        <div className="relative">
+            <input
+                type="text"
+                placeholder="Caută după nume sau mesaj..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+            <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+        </div>
       </div>
       
       <div className="flex-1 overflow-y-auto">
-        {filteredConversations.length === 0 && (
+        {finalConversationList.length === 0 && (
             <div className="p-8 text-center text-gray-400 text-sm">
-                {filterOverdue ? 'Nicio conversație expirată.' : 'Nicio conversație.'}
+                Niciun rezultat găsit.
             </div>
         )}
 
-        {filteredConversations.map((conv) => {
+        {finalConversationList.map((conv) => {
           const overdue = isOverdue(conv);
           const lastMsg = conv.messages[conv.messages.length - 1];
           const isSelected = selectedId === conv.id;
