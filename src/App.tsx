@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import ConversationList from '@/components/ConversationList';
 import ChatWindow from '@/components/ChatWindow';
 import LoginScreen from '@/components/LoginScreen';
@@ -18,6 +18,26 @@ const App: React.FC = () => {
   const [presetMessage, setPresetMessage] = useState<PresetMessage>(DEFAULT_PRESET_MESSAGE);
   const [showSettings, setShowSettings] = useState(false);
   const [isLoadingData, setIsLoadingData] = useState(false);
+
+  // Load auth data from localStorage on initial render
+  useEffect(() => {
+    const storedAuthData = localStorage.getItem('authData');
+    if (storedAuthData) {
+      const parsedAuthData = JSON.parse(storedAuthData);
+      setAuthData(parsedAuthData);
+      setIsAuthenticated(true);
+      handleRefreshFacebookConnection(parsedAuthData);
+    }
+  }, []);
+
+  // Save auth data to localStorage whenever it changes
+  useEffect(() => {
+    if (authData) {
+      localStorage.setItem('authData', JSON.stringify(authData));
+    } else {
+      localStorage.removeItem('authData');
+    }
+  }, [authData]);
 
   // Stats Calculations
   const overdueCount = conversations.filter(c => {
@@ -93,20 +113,21 @@ const App: React.FC = () => {
     }
   };
 
-  const handleRefreshFacebookConnection = async () => {
-    if (!authData?.accessToken) {
-      alert("Te rog completează Access Token.");
-      return;
+  const handleRefreshFacebookConnection = async (credentials?: {accessToken: string, pageId: string}) => {
+    const token = credentials?.accessToken || authData?.accessToken;
+    if (!token) {
+        alert("Te rog completează Access Token.");
+        return;
     }
 
     setIsLoadingData(true);
     try {
       // 1. Verify Page Details again to ensure ID is correct
-      const pageDetails = await getFacebookPageDetails(authData.accessToken);
+      const pageDetails = await getFacebookPageDetails(token);
       
       // 2. Update Auth Data with canonical ID
       const newAuthData = {
-          ...authData,
+          accessToken: token,
           pageId: pageDetails.id,
           pageName: pageDetails.name
       };
@@ -116,7 +137,9 @@ const App: React.FC = () => {
       const data = await getPageConversations(newAuthData.pageId, newAuthData.accessToken);
       setConversations(data);
       
-      alert(`Conexiune actualizată pentru pagina: ${pageDetails.name}`);
+      if (!credentials) {
+        alert(`Conexiune actualizată pentru pagina: ${pageDetails.name}`);
+      }
     } catch (error) {
       console.error("Refresh failed", error);
       alert(`Nu s-au putut prelua datele: ${(error as Error).message}`);
@@ -193,7 +216,7 @@ const App: React.FC = () => {
     <div className="flex h-screen overflow-hidden bg-gray-100">
       
       {/* Sidebar - Mobile Responsive */}
-      <div className={`fixed inset-y-0 left-0 z-20 w-80 bg-white transform ${selectedId ? '-translate-x-full' : 'translate-x-0'} md:relative md:translate-x-0 transition duration-200 ease-in-out md:flex md:flex-col border-r border-gray-200`}>
+      <div className={`fixed inset-y-0 left-0 z-20 w-80 bg-white transform ${selectedId ? '-translate-x-full' : 'translate-x-0'} md:relative md:translate-x-0 transition duration-200 ease-in-out md:flex md:flex-col border-r border-gray-200 shrink-0`}>
         {/* App Title & Settings Toggle */}
         <div className="bg-blue-600 p-4 text-white flex justify-between items-center shadow-md">
             <div>
@@ -247,7 +270,7 @@ const App: React.FC = () => {
       </div>
 
       {/* Main Chat Area */}
-      <main className="flex-1 flex flex-col h-full w-full relative z-10 bg-white">
+      <main className="flex-1 flex flex-col h-full w-full relative z-10 bg-white overflow-hidden">
         {selectedId && (
             <button 
                 onClick={() => setSelectedId(null)}
@@ -319,7 +342,7 @@ const App: React.FC = () => {
                             />
                         </div>
                         <button
-                            onClick={handleRefreshFacebookConnection}
+                            onClick={() => handleRefreshFacebookConnection()}
                             className="w-full flex items-center justify-center gap-2 py-2 px-4 bg-blue-50 text-blue-700 hover:bg-blue-100 rounded-lg text-xs font-bold transition-colors border border-blue-200 mt-2"
                         >
                              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.3"/></svg>
