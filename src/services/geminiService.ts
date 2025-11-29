@@ -1,5 +1,5 @@
 import { GoogleGenAI } from "@google/genai";
-import { Message } from "../types";
+import { Message } from "@/types";
 
 export const generateFollowUpMessage = async (
   partnerName: string,
@@ -8,7 +8,7 @@ export const generateFollowUpMessage = async (
   try {
     // Instantiate GoogleGenAI here to ensure we use the latest API Key from the environment
     // This supports the case where the user updates the key via the Settings menu
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
 
     const conversationText = history.map(m => 
       `${m.sender === 'me' ? 'Eu (Page)' : partnerName}: ${m.text}`

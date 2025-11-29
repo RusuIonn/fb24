@@ -1,5 +1,5 @@
-import { Conversation, Message } from '../types';
-import { MOCK_CONVERSATIONS } from '../constants';
+import { Conversation, Message } from '@/types';
+import { MOCK_CONVERSATIONS } from '@/constants';
 
 const GRAPH_API_VERSION = 'v19.0';
 
