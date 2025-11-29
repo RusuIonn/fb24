@@ -20,6 +20,7 @@ const App: React.FC = () => {
   const [presetMessage, setPresetMessage] = useState<PresetMessage>(DEFAULT_PRESET_MESSAGE);
   const [showSettings, setShowSettings] = useState(false);
   const [isLoadingData, setIsLoadingData] = useState(false);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   const [hasApiKey, setHasApiKey] = useState(false);
 
   // 1. Load Auth from LocalStorage on Mount
@@ -83,6 +84,7 @@ const App: React.FC = () => {
   // Reusable function to load data
   const loadConversations = async (pageId: string, token: string) => {
     setIsLoadingData(true);
+    setFetchError(null);
     try {
       const data = await getPageConversations(pageId, token);
       setConversations(data);
@@ -99,9 +101,7 @@ const App: React.FC = () => {
           handleLogout();
           alert("Sesiunea de Facebook a expirat sau token-ul este invalid. Te rugăm să te conectezi din nou.");
       } else {
-          // Only show generic alert if it's not a background refresh
-          // But since this can be called on init, maybe we skip alert unless it's catastrophic
-          console.warn("Retrying later might fix this.");
+          setFetchError(`Eroare conexiune: ${error.message || 'Verifică internetul'}`);
       }
     } finally {
       setIsLoadingData(false);
@@ -259,6 +259,7 @@ const App: React.FC = () => {
     return <LoginScreen onLogin={handleLogin} isLoading={isLoggingIn} />;
   }
 
+  // Loading Screen
   if (isLoadingData && conversations.length === 0) {
     return (
       <div className="h-screen flex items-center justify-center bg-gray-100 flex-col gap-4">
@@ -267,6 +268,33 @@ const App: React.FC = () => {
         <button onClick={handleLogout} className="text-xs text-blue-500 hover:underline mt-4">
             Anulează și Deconectează
         </button>
+      </div>
+    );
+  }
+
+  // Error Screen
+  if (fetchError && conversations.length === 0) {
+    return (
+      <div className="h-screen flex items-center justify-center bg-gray-100 flex-col gap-4 p-4 text-center">
+        <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center text-red-500 mb-2">
+            <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+        </div>
+        <h2 className="text-xl font-bold text-gray-800">Eroare la încărcare</h2>
+        <p className="text-gray-500 max-w-sm">{fetchError}</p>
+        <div className="flex gap-3 mt-4">
+            <button 
+                onClick={() => authData && loadConversations(authData.pageId, authData.accessToken)} 
+                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+            >
+                Reîncearcă
+            </button>
+            <button 
+                onClick={handleLogout} 
+                className="px-6 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors font-medium"
+            >
+                Deconectare
+            </button>
+        </div>
       </div>
     );
   }
