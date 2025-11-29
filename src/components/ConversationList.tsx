@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Conversation } from '../types';
+import { Conversation } from '@/types';
 
 interface ConversationListProps {
   conversations: Conversation[];
@@ -85,7 +85,7 @@ const ConversationList: React.FC<ConversationListProps> = ({ conversations, sele
             <div
               key={conv.id}
               onClick={() => onSelect(conv.id)}
-              className={`p-4 border-b border-gray-100 cursor-pointer transition-colors ${bgClass} ${borderClass}`}
+              className={`conversation-item p-4 border-b border-gray-100 cursor-pointer transition-colors ${bgClass} ${borderClass}`}
             >
               <div className="flex items-center gap-3">
                 <div className="relative">
