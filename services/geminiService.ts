@@ -3,32 +3,12 @@ import { Message } from "../types";
 
 export const generateFollowUpMessage = async (
   partnerName: string,
-  history: Message[],
-  manualApiKey?: string
+  history: Message[]
 ): Promise<string> => {
   try {
-    // 1. Determine the API Key safely
-    let apiKey = manualApiKey;
-
-    // Safe check for process.env (prevents crash on Vercel/Browsers)
-    if (!apiKey) {
-        try {
-            // @ts-ignore
-            if (typeof process !== 'undefined' && process.env && process.env.API_KEY) {
-                // @ts-ignore
-                apiKey = process.env.API_KEY;
-            }
-        } catch (e) {
-            // ignore
-        }
-    }
-
-    if (!apiKey) {
-      return "Eroare: Lipsă API Key. Te rog configurează cheia Gemini în Setări.";
-    }
-
-    // 2. Instantiate GoogleGenAI with the resolved key
-    const ai = new GoogleGenAI({ apiKey });
+    // Instantiate GoogleGenAI here to ensure we use the latest API Key from the environment
+    // This supports the case where the user updates the key via the Settings menu
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
     const conversationText = history.map(m => 
       `${m.sender === 'me' ? 'Eu (Page)' : partnerName}: ${m.text}`
@@ -55,6 +35,6 @@ export const generateFollowUpMessage = async (
     return response.text || "Nu s-a putut genera mesajul.";
   } catch (error) {
     console.error("Gemini API Error:", error);
-    return "Eroare la generarea mesajului. Verifică validitatea API Key-ului în Setări.";
+    return "Eroare la generarea mesajului. Verifică dacă ai setat un API Key valid în Setări.";
   }
 };

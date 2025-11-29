@@ -20,10 +20,9 @@ interface ChatWindowProps {
   conversation: Conversation | null;
   onSendMessage: (conversationId: string, text: string) => void;
   presetMessage: string;
-  apiKey: string;
 }
 
-const ChatWindow: React.FC<ChatWindowProps> = ({ conversation, onSendMessage, presetMessage, apiKey }) => {
+const ChatWindow: React.FC<ChatWindowProps> = ({ conversation, onSendMessage, presetMessage }) => {
   const [inputText, setInputText] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -47,11 +46,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversation, onSendMessage, pr
   const handleGenerateAI = async () => {
     if (!conversation) return;
     setIsGenerating(true);
-    const generatedText = await generateFollowUpMessage(
-        conversation.partnerName, 
-        conversation.messages,
-        apiKey
-    );
+    const generatedText = await generateFollowUpMessage(conversation.partnerName, conversation.messages);
     setInputText(generatedText);
     setIsGenerating(false);
   };

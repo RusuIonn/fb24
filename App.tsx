@@ -1,4 +1,4 @@
-import React, { useState, useEffect, Component, ReactNode } from 'react';
+import React, { useState, useEffect } from 'react';
 import ConversationList from './components/ConversationList';
 import ChatWindow from './components/ChatWindow';
 import LoginScreen from './components/LoginScreen';
@@ -6,74 +6,7 @@ import { Conversation, Message, PresetMessage } from './types';
 import { DEFAULT_PRESET_MESSAGE } from './constants';
 import { loginToFacebook, getPageConversations, sendFacebookMessage, getFacebookPageDetails } from './services/facebookService';
 
-const STORAGE_KEY = 'messenger_pulse_auth';
-const GEMINI_KEY_STORAGE = 'messenger_pulse_gemini_key';
-
-// Helper for safe environment variable access (prevents Vercel/Browser crash)
-const getSafeEnvApiKey = () => {
-  try {
-    // @ts-ignore
-    if (typeof process !== 'undefined' && process && process.env) {
-      // @ts-ignore
-      return process.env.API_KEY || '';
-    }
-  } catch (e) {
-    return '';
-  }
-  return '';
-};
-
-interface ErrorBoundaryProps {
-  children?: ReactNode;
-}
-
-interface ErrorBoundaryState {
-  hasError: boolean;
-  error: Error | null;
-}
-
-// Error Boundary Component to catch crashes
-class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
-  state: ErrorBoundaryState = { hasError: false, error: null };
-
-  static getDerivedStateFromError(error: Error): ErrorBoundaryState {
-    return { hasError: true, error };
-  }
-
-  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
-    console.error("Critical Application Error:", error, errorInfo);
-  }
-
-  render() {
-    if (this.state.hasError) {
-      return (
-        <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
-          <div className="bg-white p-8 rounded-xl shadow-xl max-w-md w-full text-center">
-            <div className="w-16 h-16 bg-red-100 text-red-500 rounded-full flex items-center justify-center mx-auto mb-4">
-               <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
-            </div>
-            <h1 className="text-xl font-bold text-gray-800 mb-2">A apărut o eroare neașteptată</h1>
-            <p className="text-sm text-gray-600 mb-6 font-mono bg-gray-100 p-2 rounded text-left overflow-auto max-h-32">
-              {this.state.error?.message || 'Unknown Error'}
-            </p>
-            <button 
-              onClick={() => {
-                  localStorage.removeItem(STORAGE_KEY); // Clear auth to be safe
-                  window.location.reload();
-              }} 
-              className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition w-full font-semibold"
-            >
-              Reîncarcă Aplicația
-            </button>
-          </div>
-        </div>
-      );
-    }
-    return this.props.children;
-  }
-}
-
-const AppContent: React.FC = () => {
+const App: React.FC = () => {
   // Auth State
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
@@ -85,111 +18,34 @@ const AppContent: React.FC = () => {
   const [presetMessage, setPresetMessage] = useState<PresetMessage>(DEFAULT_PRESET_MESSAGE);
   const [showSettings, setShowSettings] = useState(false);
   const [isLoadingData, setIsLoadingData] = useState(false);
-  const [fetchError, setFetchError] = useState<string | null>(null);
-  
-  // Gemini API Key State
-  const [hasEnvApiKey, setHasEnvApiKey] = useState(false);
-  const [customApiKey, setCustomApiKey] = useState('');
-  const [isAiStudioEnvironment, setIsAiStudioEnvironment] = useState(false);
+  const [hasApiKey, setHasApiKey] = useState(false);
 
-  // 1. Load Auth & Settings from LocalStorage on Mount
+  // Check for API Key presence
   useEffect(() => {
-    // Auth
-    const storedAuth = localStorage.getItem(STORAGE_KEY);
-    if (storedAuth) {
-      try {
-        const parsedAuth = JSON.parse(storedAuth);
-        if (parsedAuth && parsedAuth.accessToken && parsedAuth.pageId) {
-          setAuthData(parsedAuth);
-          setIsAuthenticated(true);
-          // Auto-fetch data
-          loadConversations(parsedAuth.pageId, parsedAuth.accessToken);
-        }
-      } catch (e) {
-        console.error("Failed to parse auth data", e);
-        localStorage.removeItem(STORAGE_KEY);
+    checkApiKey();
+  }, [showSettings]);
+
+  const checkApiKey = async () => {
+    try {
+      if ((window as any).aistudio?.hasSelectedApiKey) {
+        const has = await (window as any).aistudio.hasSelectedApiKey();
+        setHasApiKey(has);
       }
-    }
-
-    // Gemini Key
-    const storedGeminiKey = localStorage.getItem(GEMINI_KEY_STORAGE);
-    if (storedGeminiKey) {
-        setCustomApiKey(storedGeminiKey);
-    }
-
-    checkEnvironment();
-  }, []);
-
-  // 2. Save Auth to LocalStorage on Change
-  useEffect(() => {
-    if (authData) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(authData));
-    } else {
-      localStorage.removeItem(STORAGE_KEY);
-    }
-  }, [authData]);
-
-  // 3. Save Gemini Key to LocalStorage
-  useEffect(() => {
-      if (customApiKey) {
-          localStorage.setItem(GEMINI_KEY_STORAGE, customApiKey);
-      } else {
-          localStorage.removeItem(GEMINI_KEY_STORAGE);
-      }
-  }, [customApiKey]);
-
-  // Check environment capabilities
-  const checkEnvironment = async () => {
-    const isAiStudio = !!(window as any).aistudio;
-    setIsAiStudioEnvironment(isAiStudio);
-    
-    if (isAiStudio) {
-         try {
-            if ((window as any).aistudio?.hasSelectedApiKey) {
-                const has = await (window as any).aistudio.hasSelectedApiKey();
-                setHasEnvApiKey(has);
-            }
-        } catch (e) {
-            console.error("Error checking API key status", e);
-        }
+    } catch (e) {
+      console.error("Error checking API key status", e);
     }
   };
 
-  const handleSetAiStudioKey = async () => {
+  const handleSetApiKey = async () => {
     try {
       if ((window as any).aistudio?.openSelectKey) {
         await (window as any).aistudio.openSelectKey();
-        await checkEnvironment(); // Re-check status after selection
+        await checkApiKey(); // Re-check status after selection
+      } else {
+        alert("Selectorul de chei API nu este disponibil în acest mediu.");
       }
     } catch (e) {
       console.error("Error opening key selector", e);
-    }
-  };
-
-  // Reusable function to load data
-  const loadConversations = async (pageId: string, token: string) => {
-    setIsLoadingData(true);
-    setFetchError(null);
-    try {
-      const data = await getPageConversations(pageId, token);
-      setConversations(data);
-    } catch (err) {
-      console.error("Data fetch error:", err);
-      
-      const error = err as any;
-      const errMsg = error.message?.toLowerCase() || '';
-      const errCode = error.code;
-
-      // Handle Token Expiry (Code 190) or Session Invalid
-      if (errCode === 190 || errMsg.includes('token') || errMsg.includes('session') || errMsg.includes('validate')) {
-          console.log("Token invalid or expired. Logging out.");
-          handleLogout();
-          alert("Sesiunea de Facebook a expirat sau token-ul este invalid. Te rugăm să te conectezi din nou.");
-      } else {
-          setFetchError(`Eroare conexiune: ${error.message || 'Verifică conexiunea la internet sau antivirusul.'}`);
-      }
-    } finally {
-      setIsLoadingData(false);
     }
   };
 
@@ -247,14 +103,23 @@ const AppContent: React.FC = () => {
       });
       setIsAuthenticated(true);
       
-      // Load data
-      await loadConversations(result.pageId, result.accessToken);
+      // Fetch data immediately after login
+      setIsLoadingData(true);
+      try {
+        const data = await getPageConversations(result.pageId, result.accessToken);
+        setConversations(data);
+      } catch (err) {
+        console.error("Data fetch error on login:", err);
+        alert("Autentificare reușită, dar nu s-au putut prelua conversațiile. Verificați permisiunile.");
+        setConversations([]);
+      }
 
     } catch (error) {
       console.error("Login failed", error);
       alert("Autentificarea a eșuat. Încearcă din nou.");
     } finally {
       setIsLoggingIn(false);
+      setIsLoadingData(false);
     }
   };
 
@@ -278,12 +143,14 @@ const AppContent: React.FC = () => {
       setAuthData(newAuthData);
 
       // 3. Fetch Conversations
-      await loadConversations(newAuthData.pageId, newAuthData.accessToken);
+      const data = await getPageConversations(newAuthData.pageId, newAuthData.accessToken);
+      setConversations(data);
       
       alert(`Conexiune actualizată pentru pagina: ${pageDetails.name}`);
     } catch (error) {
       console.error("Refresh failed", error);
       alert(`Nu s-au putut prelua datele: ${(error as Error).message}`);
+    } finally {
       setIsLoadingData(false);
     }
   };
@@ -335,7 +202,6 @@ const AppContent: React.FC = () => {
     setAuthData(null);
     setConversations([]);
     setSelectedId(null);
-    localStorage.removeItem(STORAGE_KEY);
   };
 
   const activeConversation = conversations.find(c => c.id === selectedId) || null;
@@ -344,43 +210,11 @@ const AppContent: React.FC = () => {
     return <LoginScreen onLogin={handleLogin} isLoading={isLoggingIn} />;
   }
 
-  // Loading Screen
-  if (isLoadingData && conversations.length === 0) {
+  if (isLoadingData) {
     return (
       <div className="h-screen flex items-center justify-center bg-gray-100 flex-col gap-4">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
         <p className="text-gray-500 font-medium">Se sincronizează datele cu Facebook...</p>
-        <p className="text-xs text-gray-400">Preluăm loturi de conversații...</p>
-        <button onClick={handleLogout} className="text-xs text-blue-500 hover:underline mt-4">
-            Anulează și Deconectează
-        </button>
-      </div>
-    );
-  }
-
-  // Error Screen
-  if (fetchError && conversations.length === 0) {
-    return (
-      <div className="h-screen flex items-center justify-center bg-gray-100 flex-col gap-4 p-4 text-center">
-        <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center text-red-500 mb-2">
-            <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
-        </div>
-        <h2 className="text-xl font-bold text-gray-800">Eroare la încărcare</h2>
-        <p className="text-gray-500 max-w-sm text-sm">{fetchError}</p>
-        <div className="flex gap-3 mt-4">
-            <button 
-                onClick={() => authData && loadConversations(authData.pageId, authData.accessToken)} 
-                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
-            >
-                Reîncearcă
-            </button>
-            <button 
-                onClick={handleLogout} 
-                className="px-6 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors font-medium"
-            >
-                Deconectare
-            </button>
-        </div>
       </div>
     );
   }
@@ -456,7 +290,6 @@ const AppContent: React.FC = () => {
             conversation={activeConversation} 
             onSendMessage={handleSendMessage}
             presetMessage={presetMessage}
-            apiKey={customApiKey || getSafeEnvApiKey()}
         />
       </div>
 
@@ -531,51 +364,31 @@ const AppContent: React.FC = () => {
                         <label className="block text-sm font-medium text-gray-700">
                             Gemini API Key
                         </label>
-                        <span className={`text-[10px] px-2 py-0.5 rounded-full border ${hasEnvApiKey || customApiKey ? 'bg-green-50 text-green-700 border-green-200' : 'bg-yellow-50 text-yellow-700 border-yellow-200'}`}>
-                            {hasEnvApiKey || customApiKey ? 'Conectat' : 'Nu este setat'}
+                        <span className={`text-[10px] px-2 py-0.5 rounded-full border ${hasApiKey ? 'bg-green-50 text-green-700 border-green-200' : 'bg-yellow-50 text-yellow-700 border-yellow-200'}`}>
+                            {hasApiKey ? 'Conectat' : 'Nu este setat'}
                         </span>
                     </div>
                     
                     <div className="flex flex-col gap-2">
-                         {isAiStudioEnvironment ? (
-                             <>
-                                <div className="relative">
-                                    <input 
-                                        type="password" 
-                                        value={hasEnvApiKey ? "********************************" : ""} 
-                                        disabled
-                                        placeholder="Niciun API Key setat"
-                                        className="w-full p-2.5 border border-gray-200 bg-gray-50 rounded-lg text-sm text-gray-500 mb-2 cursor-not-allowed"
-                                    />
-                                </div>
-                                <button
-                                    onClick={handleSetAiStudioKey}
-                                    className="flex items-center justify-center gap-2 w-full p-2.5 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-700 hover:bg-blue-100 transition-colors font-medium"
-                                >
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"></path></svg>
-                                    {hasEnvApiKey ? 'Schimbă API Key (AI Studio)' : 'Configurează API Key'}
-                                </button>
-                                <p className="text-[10px] text-gray-400 text-center">
-                                    Deschide selectorul securizat Google AI Studio.
-                                </p>
-                             </>
-                         ) : (
-                             <>
-                                <input 
-                                    type="password" 
-                                    value={customApiKey}
-                                    onChange={(e) => setCustomApiKey(e.target.value)}
-                                    placeholder="Lipește cheia Gemini API (AI Studio)"
-                                    className="w-full p-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                />
-                                <p className="text-[10px] text-gray-400">
-                                    Deoarece nu ești în mediul AI Studio, trebuie să introduci manual cheia API.
-                                    <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noreferrer" className="text-blue-500 hover:underline ml-1">
-                                        Obține cheia aici.
-                                    </a>
-                                </p>
-                             </>
-                         )}
+                         <div className="relative">
+                            <input 
+                                type="password" 
+                                value={hasApiKey ? "********************************" : ""} 
+                                disabled
+                                placeholder="Niciun API Key setat"
+                                className="w-full p-2.5 border border-gray-200 bg-gray-50 rounded-lg text-sm text-gray-500 mb-2 cursor-not-allowed"
+                            />
+                        </div>
+                        <button
+                            onClick={handleSetApiKey}
+                            className="flex items-center justify-center gap-2 w-full p-2.5 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-700 hover:bg-blue-100 transition-colors font-medium"
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"></path></svg>
+                            {hasApiKey ? 'Schimbă API Key' : 'Configurează API Key'}
+                        </button>
+                        <p className="text-[10px] text-gray-400 text-center">
+                            Deschide fereastra securizată Google AI Studio pentru a selecta cheia.
+                        </p>
                     </div>
                 </div>
 
@@ -597,14 +410,6 @@ const AppContent: React.FC = () => {
         </div>
       )}
     </div>
-  );
-};
-
-const App: React.FC = () => {
-  return (
-    <ErrorBoundary>
-      <AppContent />
-    </ErrorBoundary>
   );
 };
 
