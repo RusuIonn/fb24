@@ -1,5 +1,5 @@
 import { GoogleGenAI } from "@google/genai";
-import { Message } from "../types";
+import { Message } from "@/types";
 
 // Initialize the API client
 // process.env.API_KEY is handled by Vite define in vite.config.ts
