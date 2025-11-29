@@ -66,9 +66,9 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversation, onSendMessage, pr
   const isOverdue = lastMsg?.sender === 'me' && (Date.now() - lastMsg.timestamp > 24 * 60 * 60 * 1000);
 
   return (
-    <div className="flex-1 flex flex-col h-full bg-white relative">
+    <div className="flex-1 flex flex-col h-full bg-white relative overflow-hidden">
       {/* Header */}
-      <div className="p-4 border-b border-gray-200 flex justify-between items-center bg-white shadow-sm z-10">
+      <div className="p-4 border-b border-gray-200 flex justify-between items-center bg-white shadow-sm z-10 shrink-0">
         <div className="flex items-center gap-3">
             <img src={conversation.avatarUrl} className="w-10 h-10 rounded-full" alt="avatar" />
           <div>
@@ -136,7 +136,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversation, onSendMessage, pr
       </div>
 
       {/* Input Area */}
-      <div className="p-4 bg-white border-t border-gray-200">
+      <div className="p-4 bg-white border-t border-gray-200 shrink-0">
         
         {/* Quick Actions for Overdue */}
         {isOverdue && (
