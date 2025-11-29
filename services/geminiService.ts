@@ -1,18 +1,15 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { GoogleGenAI } from "@google/genai";
 import { Message } from "../types";
 
 // Initialize the API client
 // process.env.API_KEY is handled by Vite define in vite.config.ts
-const genAI = new GoogleGenerativeAI(process.env.API_KEY || "");
+const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 export const generateFollowUpMessage = async (
   partnerName: string,
   history: Message[]
 ): Promise<string> => {
   try {
-    // Use gemini-1.5-flash as the standard stable model
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-
     const conversationText = history.map(m => 
       `${m.sender === 'me' ? 'Eu (Page)' : partnerName}: ${m.text}`
     ).join('\n');
@@ -30,9 +27,12 @@ export const generateFollowUpMessage = async (
       Te rog generează doar textul mesajului de follow-up, fără ghilimele sau text introductiv. Mesajul trebuie să fie natural.
     `;
 
-    const result = await model.generateContent(prompt);
-    const response = await result.response;
-    const text = response.text();
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash',
+      contents: prompt,
+    });
+    
+    const text = response.text;
 
     return text || "Nu s-a putut genera mesajul.";
   } catch (error) {
