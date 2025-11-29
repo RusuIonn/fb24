@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import ConversationList from './components/ConversationList';
-import ChatWindow from './components/ChatWindow';
-import LoginScreen from './components/LoginScreen';
-import { Conversation, Message, PresetMessage } from './types';
-import { DEFAULT_PRESET_MESSAGE } from './constants';
-import { loginToFacebook, getPageConversations, sendFacebookMessage, getFacebookPageDetails } from './services/facebookService';
+import ConversationList from '@/components/ConversationList';
+import ChatWindow from '@/components/ChatWindow';
+import LoginScreen from '@/components/LoginScreen';
+import { Conversation, Message, PresetMessage } from '@/types';
+import { DEFAULT_PRESET_MESSAGE } from '@/constants';
+import { loginToFacebook, getPageConversations, sendFacebookMessage, getFacebookPageDetails } from '@/services/facebookService';
 
 const App: React.FC = () => {
   // Auth State

@@ -1,5 +1,5 @@
-import { Conversation, Message } from '../types';
-import { MOCK_CONVERSATIONS } from '../constants';
+import { Conversation, Message } from '@/types';
+import { MOCK_CONVERSATIONS } from '@/constants';
 
 const GRAPH_API_VERSION = 'v19.0';
 
@@ -58,22 +58,37 @@ export const getPageConversations = async (pageId: string, accessToken: string):
     });
   }
 
-  // 2. Dacă avem un token real, apelăm Facebook API
+  // 2. Dacă avem un token real, apelăm Facebook API cu paginare
   console.log(`Se conectează la Graph API Real pentru pagina ${pageId}...`);
-  try {
-    // Cerem conversațiile împreună cu mesajele (limitat la 50 pentru a evita erorile de volum) și participanții
-    // Optimizare: limit=200 conversații și limit=50 mesaje per conversație
-    const fields = 'participants,updated_time,messages.limit(50){message,created_time,from,to}';
-    const url = `https://graph.facebook.com/${GRAPH_API_VERSION}/${pageId}/conversations?limit=200&fields=${fields}&access_token=${accessToken}`;
-    
-    const response = await fetch(url);
-    const data = await response.json();
+  let allConversations: any[] = [];
+  const MAX_PAGES = 6;
+  let pagesFetched = 0;
 
-    if (data.error) {
-      throw new Error(`Facebook API Error: ${data.error.message}`);
+  try {
+    const fields = 'participants,updated_time,messages.limit(50){message,created_time,from,to}';
+    let url: string | null = `https://graph.facebook.com/${GRAPH_API_VERSION}/${pageId}/conversations?limit=50&fields=${fields}&access_token=${accessToken}`;
+
+    while (url && pagesFetched < MAX_PAGES) {
+      pagesFetched++;
+      console.log(`Fetching page ${pagesFetched}/${MAX_PAGES} from URL: ${url}`);
+
+      const response = await fetch(url);
+      const data = await response.json();
+
+      if (data.error) {
+        throw new Error(`Facebook API Error: ${data.error.message}`);
+      }
+
+      if (data.data && data.data.length > 0) {
+        allConversations = [...allConversations, ...data.data];
+      }
+
+      // Preia următorul URL pentru paginare
+      url = data.paging?.next || null;
     }
 
-    return transformFacebookData(data, pageId);
+    // Transformă datele agregate
+    return transformFacebookData({ data: allConversations }, pageId);
   } catch (error) {
     console.error("Eroare la preluarea conversațiilor:", error);
     throw error;
