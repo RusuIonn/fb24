@@ -10,6 +10,25 @@ interface FacebookAuthResponse {
 }
 
 /**
+ * Helper: Reîncearcă automat o cerere fetch dacă eșuează (ex: rețea instabilă).
+ */
+const fetchWithRetry = async (url: string, options?: RequestInit, retries = 3, delay = 1000): Promise<Response> => {
+  try {
+    const response = await fetch(url, options);
+    // Dacă serverul returnează 5xx sau eroare de rețea, aruncăm excepție pentru a declanșa catch-ul
+    if (!response.ok && response.status >= 500) {
+        throw new Error(`Server error: ${response.status}`);
+    }
+    return response;
+  } catch (err) {
+    if (retries <= 0) throw err;
+    console.warn(`Fetch failed, retrying in ${delay}ms... (${retries} retries left)`);
+    await new Promise(res => setTimeout(res, delay));
+    return fetchWithRetry(url, options, retries - 1, delay * 1.5); // Backoff exponențial
+  }
+};
+
+/**
  * Verifică token-ul și preia detaliile reale ale paginii (ID, Nume).
  */
 export const getFacebookPageDetails = async (accessToken: string): Promise<{id: string, name: string}> => {
@@ -17,7 +36,8 @@ export const getFacebookPageDetails = async (accessToken: string): Promise<{id: 
      return { id: '1000123456789', name: 'Magazin Demo (Mock)' };
   }
 
-  const response = await fetch(`https://graph.facebook.com/${GRAPH_API_VERSION}/me?fields=id,name&access_token=${accessToken}`);
+  // Folosim fetchWithRetry pentru a fi mai rezistenți la întreruperi
+  const response = await fetchWithRetry(`https://graph.facebook.com/${GRAPH_API_VERSION}/me?fields=id,name&access_token=${accessToken}`);
   const data = await response.json();
   
   if (data.error) {
@@ -62,11 +82,12 @@ export const getPageConversations = async (pageId: string, accessToken: string):
   console.log(`Se conectează la Graph API Real pentru pagina ${pageId}...`);
   try {
     // Cerem conversațiile împreună cu mesajele
-    // REDUCERE DRASTICĂ LIMITE: limit=20 conversații și limit=20 mesaje pentru stabilitate maximă
+    // LIMITĂ CONSERVATOARE: 20 conversații x 20 mesaje pentru stabilitate
     const fields = 'participants,updated_time,messages.limit(20){message,created_time,from,to}';
     const url = `https://graph.facebook.com/${GRAPH_API_VERSION}/${pageId}/conversations?limit=20&fields=${fields}&access_token=${accessToken}`;
     
-    const response = await fetch(url);
+    // Utilizăm wrapper-ul cu retry
+    const response = await fetchWithRetry(url);
     const data = await response.json();
 
     if (data.error) {
@@ -101,7 +122,7 @@ export const sendFacebookMessage = async (
   console.log(`Se trimite mesaj real către ${recipientId}`);
   try {
     const url = `https://graph.facebook.com/${GRAPH_API_VERSION}/me/messages?access_token=${accessToken}`;
-    const response = await fetch(url, {
+    const response = await fetchWithRetry(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
