@@ -1,15 +1,15 @@
 import { GoogleGenAI } from "@google/genai";
 import { Message } from "@/types";
 
+// Initialize the API client
+// process.env.API_KEY is handled by Vite define in vite.config.ts
+const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+
 export const generateFollowUpMessage = async (
   partnerName: string,
   history: Message[]
 ): Promise<string> => {
   try {
-    // Instantiate GoogleGenAI here to ensure we use the latest API Key from the environment
-    // This supports the case where the user updates the key via the Settings menu
-    const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
-
     const conversationText = history.map(m => 
       `${m.sender === 'me' ? 'Eu (Page)' : partnerName}: ${m.text}`
     ).join('\n');
@@ -31,10 +31,12 @@ export const generateFollowUpMessage = async (
       model: 'gemini-2.5-flash',
       contents: prompt,
     });
+    
+    const text = response.text;
 
-    return response.text || "Nu s-a putut genera mesajul.";
+    return text || "Nu s-a putut genera mesajul.";
   } catch (error) {
     console.error("Gemini API Error:", error);
-    return "Eroare la generarea mesajului. Verifică dacă ai setat un API Key valid în Setări.";
+    return "Eroare la generarea mesajului. Verifică configurația API Key.";
   }
 };

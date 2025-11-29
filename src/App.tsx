@@ -1,10 +1,10 @@
-import React, { useState, useEffect } from 'react';
-import ConversationList from '@/components/ConversationList';
-import ChatWindow from '@/components/ChatWindow';
-import LoginScreen from '@/components/LoginScreen';
-import { Conversation, Message, PresetMessage } from '@/types';
-import { DEFAULT_PRESET_MESSAGE } from '@/constants';
-import { loginToFacebook, getPageConversations, sendFacebookMessage, getFacebookPageDetails } from '@/services/facebookService';
+import React, { useState } from 'react';
+import ConversationList from './components/ConversationList';
+import ChatWindow from './components/ChatWindow';
+import LoginScreen from './components/LoginScreen';
+import { Conversation, Message, PresetMessage } from './types';
+import { DEFAULT_PRESET_MESSAGE } from './constants';
+import { loginToFacebook, getPageConversations, sendFacebookMessage, getFacebookPageDetails } from './services/facebookService';
 
 const App: React.FC = () => {
   // Auth State
@@ -18,36 +18,6 @@ const App: React.FC = () => {
   const [presetMessage, setPresetMessage] = useState<PresetMessage>(DEFAULT_PRESET_MESSAGE);
   const [showSettings, setShowSettings] = useState(false);
   const [isLoadingData, setIsLoadingData] = useState(false);
-  const [hasApiKey, setHasApiKey] = useState(false);
-
-  // Check for API Key presence
-  useEffect(() => {
-    checkApiKey();
-  }, [showSettings]);
-
-  const checkApiKey = async () => {
-    try {
-      if ((window as any).aistudio?.hasSelectedApiKey) {
-        const has = await (window as any).aistudio.hasSelectedApiKey();
-        setHasApiKey(has);
-      }
-    } catch (e) {
-      console.error("Error checking API key status", e);
-    }
-  };
-
-  const handleSetApiKey = async () => {
-    try {
-      if ((window as any).aistudio?.openSelectKey) {
-        await (window as any).aistudio.openSelectKey();
-        await checkApiKey(); // Re-check status after selection
-      } else {
-        alert("Selectorul de chei API nu este disponibil în acest mediu.");
-      }
-    } catch (e) {
-      console.error("Error opening key selector", e);
-    }
-  };
 
   // Stats Calculations
   const overdueCount = conversations.filter(c => {
@@ -355,40 +325,6 @@ const App: React.FC = () => {
                              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.3"/></svg>
                              Validează & Actualizează
                         </button>
-                    </div>
-                </div>
-
-                {/* Gemini API Key Configuration Section */}
-                <div className="mb-6 pt-6 border-t border-gray-100">
-                    <div className="flex justify-between items-start mb-2">
-                        <label className="block text-sm font-medium text-gray-700">
-                            Gemini API Key
-                        </label>
-                        <span className={`text-[10px] px-2 py-0.5 rounded-full border ${hasApiKey ? 'bg-green-50 text-green-700 border-green-200' : 'bg-yellow-50 text-yellow-700 border-yellow-200'}`}>
-                            {hasApiKey ? 'Conectat' : 'Nu este setat'}
-                        </span>
-                    </div>
-                    
-                    <div className="flex flex-col gap-2">
-                         <div className="relative">
-                            <input 
-                                type="password" 
-                                value={hasApiKey ? "********************************" : ""} 
-                                disabled
-                                placeholder="Niciun API Key setat"
-                                className="w-full p-2.5 border border-gray-200 bg-gray-50 rounded-lg text-sm text-gray-500 mb-2 cursor-not-allowed"
-                            />
-                        </div>
-                        <button
-                            onClick={handleSetApiKey}
-                            className="flex items-center justify-center gap-2 w-full p-2.5 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-700 hover:bg-blue-100 transition-colors font-medium"
-                        >
-                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"></path></svg>
-                            {hasApiKey ? 'Schimbă API Key' : 'Configurează API Key'}
-                        </button>
-                        <p className="text-[10px] text-gray-400 text-center">
-                            Deschide fereastra securizată Google AI Studio pentru a selecta cheia.
-                        </p>
                     </div>
                 </div>
 
