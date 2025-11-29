@@ -62,15 +62,18 @@ export const getPageConversations = async (pageId: string, accessToken: string):
   console.log(`Se conectează la Graph API Real pentru pagina ${pageId}...`);
   try {
     // Cerem conversațiile împreună cu mesajele
-    // REDUS LIMITELE: limit=50 conversații și limit=25 mesaje pentru a preveni eroarea "Please reduce the amount of data"
-    const fields = 'participants,updated_time,messages.limit(25){message,created_time,from,to}';
-    const url = `https://graph.facebook.com/${GRAPH_API_VERSION}/${pageId}/conversations?limit=50&fields=${fields}&access_token=${accessToken}`;
+    // REDUCERE DRASTICĂ LIMITE: limit=20 conversații și limit=20 mesaje pentru stabilitate maximă
+    const fields = 'participants,updated_time,messages.limit(20){message,created_time,from,to}';
+    const url = `https://graph.facebook.com/${GRAPH_API_VERSION}/${pageId}/conversations?limit=20&fields=${fields}&access_token=${accessToken}`;
     
     const response = await fetch(url);
     const data = await response.json();
 
     if (data.error) {
-      throw new Error(`Facebook API Error: ${data.error.message}`);
+      // Propagăm eroarea completă pentru a putea detecta token expirat în App.tsx
+      const errorObj = new Error(`Facebook API Error: ${data.error.message}`);
+      (errorObj as any).code = data.error.code;
+      throw errorObj;
     }
 
     return transformFacebookData(data, pageId);

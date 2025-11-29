@@ -88,8 +88,21 @@ const App: React.FC = () => {
       setConversations(data);
     } catch (err) {
       console.error("Data fetch error:", err);
-      // Don't show alert on auto-load to avoid annoying user if token expired, 
-      // just log it. Show alert only if manually triggered or login.
+      
+      const error = err as any;
+      const errMsg = error.message?.toLowerCase() || '';
+      const errCode = error.code;
+
+      // Handle Token Expiry (Code 190) or Session Invalid
+      if (errCode === 190 || errMsg.includes('token') || errMsg.includes('session') || errMsg.includes('validate')) {
+          console.log("Token invalid or expired. Logging out.");
+          handleLogout();
+          alert("Sesiunea de Facebook a expirat sau token-ul este invalid. Te rugăm să te conectezi din nou.");
+      } else {
+          // Only show generic alert if it's not a background refresh
+          // But since this can be called on init, maybe we skip alert unless it's catastrophic
+          console.warn("Retrying later might fix this.");
+      }
     } finally {
       setIsLoadingData(false);
     }
@@ -251,6 +264,9 @@ const App: React.FC = () => {
       <div className="h-screen flex items-center justify-center bg-gray-100 flex-col gap-4">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
         <p className="text-gray-500 font-medium">Se sincronizează datele cu Facebook...</p>
+        <button onClick={handleLogout} className="text-xs text-blue-500 hover:underline mt-4">
+            Anulează și Deconectează
+        </button>
       </div>
     );
   }
