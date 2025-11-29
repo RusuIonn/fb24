@@ -6,6 +6,8 @@ import { Conversation, Message, PresetMessage } from './types';
 import { DEFAULT_PRESET_MESSAGE } from './constants';
 import { loginToFacebook, getPageConversations, sendFacebookMessage, getFacebookPageDetails } from './services/facebookService';
 
+const STORAGE_KEY = 'messenger_pulse_auth';
+
 const App: React.FC = () => {
   // Auth State
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -19,6 +21,35 @@ const App: React.FC = () => {
   const [showSettings, setShowSettings] = useState(false);
   const [isLoadingData, setIsLoadingData] = useState(false);
   const [hasApiKey, setHasApiKey] = useState(false);
+
+  // 1. Load Auth from LocalStorage on Mount
+  useEffect(() => {
+    const storedAuth = localStorage.getItem(STORAGE_KEY);
+    if (storedAuth) {
+      try {
+        const parsedAuth = JSON.parse(storedAuth);
+        if (parsedAuth && parsedAuth.accessToken && parsedAuth.pageId) {
+          setAuthData(parsedAuth);
+          setIsAuthenticated(true);
+          // Auto-fetch data
+          loadConversations(parsedAuth.pageId, parsedAuth.accessToken);
+        }
+      } catch (e) {
+        console.error("Failed to parse auth data", e);
+        localStorage.removeItem(STORAGE_KEY);
+      }
+    }
+    checkApiKey();
+  }, []);
+
+  // 2. Save Auth to LocalStorage on Change
+  useEffect(() => {
+    if (authData) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(authData));
+    } else {
+      localStorage.removeItem(STORAGE_KEY);
+    }
+  }, [authData]);
 
   // Check for API Key presence
   useEffect(() => {
@@ -46,6 +77,21 @@ const App: React.FC = () => {
       }
     } catch (e) {
       console.error("Error opening key selector", e);
+    }
+  };
+
+  // Reusable function to load data
+  const loadConversations = async (pageId: string, token: string) => {
+    setIsLoadingData(true);
+    try {
+      const data = await getPageConversations(pageId, token);
+      setConversations(data);
+    } catch (err) {
+      console.error("Data fetch error:", err);
+      // Don't show alert on auto-load to avoid annoying user if token expired, 
+      // just log it. Show alert only if manually triggered or login.
+    } finally {
+      setIsLoadingData(false);
     }
   };
 
@@ -103,23 +149,14 @@ const App: React.FC = () => {
       });
       setIsAuthenticated(true);
       
-      // Fetch data immediately after login
-      setIsLoadingData(true);
-      try {
-        const data = await getPageConversations(result.pageId, result.accessToken);
-        setConversations(data);
-      } catch (err) {
-        console.error("Data fetch error on login:", err);
-        alert("Autentificare reușită, dar nu s-au putut prelua conversațiile. Verificați permisiunile.");
-        setConversations([]);
-      }
+      // Load data
+      await loadConversations(result.pageId, result.accessToken);
 
     } catch (error) {
       console.error("Login failed", error);
       alert("Autentificarea a eșuat. Încearcă din nou.");
     } finally {
       setIsLoggingIn(false);
-      setIsLoadingData(false);
     }
   };
 
@@ -143,14 +180,12 @@ const App: React.FC = () => {
       setAuthData(newAuthData);
 
       // 3. Fetch Conversations
-      const data = await getPageConversations(newAuthData.pageId, newAuthData.accessToken);
-      setConversations(data);
+      await loadConversations(newAuthData.pageId, newAuthData.accessToken);
       
       alert(`Conexiune actualizată pentru pagina: ${pageDetails.name}`);
     } catch (error) {
       console.error("Refresh failed", error);
       alert(`Nu s-au putut prelua datele: ${(error as Error).message}`);
-    } finally {
       setIsLoadingData(false);
     }
   };
@@ -202,6 +237,7 @@ const App: React.FC = () => {
     setAuthData(null);
     setConversations([]);
     setSelectedId(null);
+    localStorage.removeItem(STORAGE_KEY);
   };
 
   const activeConversation = conversations.find(c => c.id === selectedId) || null;
@@ -210,7 +246,7 @@ const App: React.FC = () => {
     return <LoginScreen onLogin={handleLogin} isLoading={isLoggingIn} />;
   }
 
-  if (isLoadingData) {
+  if (isLoadingData && conversations.length === 0) {
     return (
       <div className="h-screen flex items-center justify-center bg-gray-100 flex-col gap-4">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
