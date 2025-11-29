@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Conversation, Message } from '../types';
+import { Conversation } from '../types';
 import { generateFollowUpMessage } from '../services/geminiService';
 
 // Icons
